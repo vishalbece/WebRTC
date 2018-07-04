@@ -1,0 +1,378 @@
+﻿<style type="text/css">
+    .backgroundset {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        min-width: 100%;
+        min-height: 100%;
+        width: auto;
+        height: auto;
+        z-index: -100;
+        -webkit-transform: translateX(-50%) translateY(-50%);
+        transform: translateX(-50%) translateY(-50%);
+        background: url(polina.jpg) no-repeat;
+        background-size: cover;
+    }
+
+    a {
+        font-size: large !important;
+        font-family: monospace !important;
+        color: #f9d4ff !important;
+    }
+</style>
+<link href="~/Content/font-awesome.css" rel="stylesheet" />
+<div id="immediate" style="display:none;"></div>
+
+<script src="Scripts/jquery-3.0.0.js"></script>
+
+<script src="Scripts/lib/XSockets.latest.js"></script>
+<script src="Scripts/lib/XSockets.WebRTC.latest.js"></script>
+
+<input type="hidden" id="counthidn" />
+<input type="hidden" id="hidevideo" />
+<input type="hidden" id="Rhidevideo" />
+<script type="text/javascript">
+    var recorder;
+    var Erecorder;
+    var $ = function (selector, el) {
+        if (!el) el = document;
+        return el.querySelector(selector);
+    }
+
+    var trace = function (what, obj) {
+        var pre = document.createElement("pre");
+        pre.textContent = JSON.stringify(what) + " - " + JSON.stringify(obj || "");
+        $("#immediate").appendChild(pre);
+    };
+
+    var main = (function () {
+
+        if(document.getElementById("counthidn").value != "1")
+        {
+
+            document.getElementById("counthidn").value = "1";
+            var broker;
+            var rtc;
+            trace("Ready");
+            trace("Try connect the connectionBroker");
+            var ws = new XSockets.WebSocket("wss://rtcplaygrouund.azurewebsites.net:443", ["connectionbroker"], {
+                ctx: '23fbc61c-541a-4c0d-b46e-1a1f6473720a'
+            });
+
+            var onError = function (err) {
+                trace("error", arguments);
+            };
+
+            var recordMediaStream = function (stream) {
+                if ("MediaRecorder" in window === false) {
+                    trace("Recorder not started MediaRecorder not available in this browser. ");
+                    return;
+
+                }
+                recorder = new XSockets.MediaRecorder(stream);
+                recorder.start();
+                trace("Recorder started.. ");
+            };
+
+            var recordRMediaStream = function (mediaStream) {
+                if ("MediaRecorder" in window === false) {
+                    trace("Erecorder not started MediaRecorder not available in this browser. ");
+                    return;
+
+                }
+                Erecorder = new XSockets.RMediaRecorder(mediaStream);
+                Erecorder.start();
+                trace("Erecorder started.. ");
+            };
+
+            var addRemoteVideo = function (peerId, mediaStream) {
+                var remoteVideo = document.createElement("video");
+                remoteVideo.setAttribute("id", "RemoteVideoId");
+                remoteVideo.setAttribute("autoplay", "autoplay");
+                remoteVideo.setAttribute("width", "100%");
+                remoteVideo.setAttribute("height", "100%");
+                remoteVideo.setAttribute("rel", peerId);
+                attachMediaStream(remoteVideo, mediaStream);
+                remoteVideo.setAttribute("class", "backgroundset");
+
+                remoteVideo.setAttribute("volume", 0);
+                remoteVideo.setAttribute("muted", 0);
+
+                document.getElementById("locvid").className =
+                 document.getElementById("locvid").className
+               .replace(new RegExp('(?:^|\\s)'+ 'backgroundset' + '(?:\\s|$)'), ' ');
+
+
+                document.getElementById('locvid').style.width = "100%";
+                document.getElementById('locvid').style.height = "100%";
+
+                document.getElementById('RD').style.display = "none";
+                document.getElementById('localv').style.border= "1px solid gray";
+                document.getElementById('localv').style.bottom='20px';
+                document.getElementById('localv').style.maxHeight  = '17%';
+                document.getElementById('localv').style.maxWidth = "17%";
+                document.getElementById('localv').style.left = "81%";
+                // document.getElementById('localv').style.opacity = "0";
+                document.getElementById('localv').style.position  = 'absolute';
+                document.getElementById('localv').style.transition  = 'opacity 1s';
+
+                $(".remotevideos").appendChild(remoteVideo);
+
+                $("#startRrecord").addEventListener("click", function () {
+                    document.getElementById('startRrecord').style.display = "none";
+                    recordRMediaStream(mediaStream);
+                });
+                $("#stopRrecord").addEventListener("click", function () {
+                    document.getElementById('stopRrecord').style.display = "none";
+                    Erecorder.stop();
+                    Erecorder.oncompleted = function (blob, blobUrl) {
+                        trace("Erecorder blobUrl.. ", blobUrl);
+                        trace("Erecorder completed.. ");
+                        trace("Erecorder blobUrl.. ", blobUrl);
+
+                        var li = document.createElement("li");
+                        var download = document.createElement("a");
+                        download.textContent = new Date();
+                        download.setAttribute("download", XSockets.Utils.randomString(8) + ".webm");
+                        download.setAttribute("href", blobUrl);
+                        li.appendChild(download);
+                        $("#contentvv ul").append(li);
+
+                    };
+                });
+            };
+            var onConnectionLost = function (remotePeer) {
+                trace("onconnectionlost", arguments);
+                var peerId = remotePeer.PeerId;
+                var videoToRemove = $("video[rel='" + peerId + "']");
+                $(".remotevideos").removeChild(videoToRemove);
+            };
+            var oncConnectionCreated = function () {
+                console.log(arguments, rtc);
+                trace("oncconnectioncreated", arguments);
+
+            };
+            var onGetUerMedia = function (stream) {
+                trace("Successfully got some userMedia , hopefully a goat will appear..");
+                console.log("Successfully got some userMedia , hopefully a goat will appear..");
+                rtc.connectToContext(); // connect to the current context?
+            };
+
+            var onRemoteStream = function (remotePeer) {
+                trace("I Got RemoteStream", remotePeer);
+                trace("Interviewer Is Online");
+                //var v = $("<video>").attr("autoplay", "autoplay").appendTo("#remotevid");
+                //attachMediaStream($(v).get(0), remotePeer.stream);
+                addRemoteVideo(remotePeer.PeerId, remotePeer.stream);
+
+                //if(@Html.Raw(Json.Encode(ViewBag.Employee)) != 1)
+                //{
+                    document.getElementById('startrecord').style.display = "none";
+                    document.getElementById('stoprecord').style.display = "none";
+                    document.getElementById('startRrecord').style.display = "none";
+                    document.getElementById('stopRrecord').style.display = "none";
+                    document.getElementById('contentvv').style.display = "none";
+                    document.getElementById('mutevideo').style.display = "none";
+                    document.getElementById('muteAudio').style.display = "none";
+
+                //}else
+                //{
+                //    document.getElementById('startrecord').style.display = "none";
+                //    document.getElementById('stoprecord').style.display = "none";
+                //    document.getElementById('startRrecord').style.display = "";
+                //    document.getElementById('stopRrecord').style.display = "";
+                //    document.getElementById('contentvv').style.display = "";
+                //    document.getElementById('mutevideo').style.display = "";
+                //    document.getElementById('muteAudio').style.display = "";
+                //}
+                trace("Opps, we got a remote stream. lets see if its a goat..");
+            };
+
+
+
+            var onLocalStream = function (mediaStream) {
+                trace("Got a localStream", mediaStream.id);
+                attachMediaStream($(".localvideo video "), mediaStream);
+                document.getElementById("locvid").volume= 0;
+                document.getElementById("locvid").muted= 0;
+
+                //   document.getElementById('DG').style.display = "none";
+                document.getElementById('RD').style.display = "none";
+                document.getElementById('startInterview').style.display = "none";
+
+                document.getElementById('belowdiv').style.display = "";
+                //if(@Html.Raw(Json.Encode(ViewBag.Employee)) != 1)
+                //{
+                    document.getElementById('startrecord').style.display = "none";
+                    document.getElementById('stoprecord').style.display = "none";
+                    document.getElementById('startRrecord').style.display = "none";
+                    document.getElementById('stopRrecord').style.display = "none";
+                    document.getElementById('contentvv').style.display = "none";
+                    document.getElementById('mutevideo').style.display = "none";
+                    document.getElementById('muteAudio').style.display = "none";
+                //}else
+                //{
+                //    document.getElementById('startrecord').style.display = "none";
+                //    document.getElementById('stoprecord').style.display = "none";
+                //    // new changes
+                //    document.getElementById('startRrecord').style.display = "none";
+                //    document.getElementById('stopRrecord').style.display = "none";
+                //    document.getElementById('contentvv').style.display = "none";
+                //    document.getElementById('mutevideo').style.display = "";
+                //    document.getElementById('muteAudio').style.display = "";
+                //}
+                //  if user click, video , call the recorder
+                $("#startrecord").addEventListener("click", function () {
+                    recordMediaStream(rtc.getLocalStreams()[0]);
+                });
+                $("#mutevideo").addEventListener("click", function () {
+                    mediaStream.getVideoTracks()[0].enabled =
+                     !(mediaStream.getVideoTracks()[0].enabled);
+
+                });
+                $("#muteAudio").addEventListener("click", function () {
+                    mediaStream.getAudioTracks()[0].enabled =
+                     !(mediaStream.getAudioTracks()[0].enabled);
+
+                });
+                $("#fullscreen").addEventListener("click", function () {
+                    var videosContainer = document.getElementById('RemoteVideoId')
+                    if(videosContainer != null)
+                    {
+                        if (videosContainer.requestFullscreen) {
+                            videosContainer.requestFullscreen();
+                        } else if (videosContainer.mozRequestFullScreen) {
+                            videosContainer.mozRequestFullScreen(); // Firefox
+                        } else if (videosContainer.webkitRequestFullscreen) {
+                            videosContainer.webkitRequestFullscreen(); // Chrome and Safari
+                        }
+                    }
+                    var videosContainera = document.getElementById('locvid')
+                    if(videosContainera != null)
+                    {
+                        if (videosContainera.requestFullscreen) {
+                            videosContainera.requestFullscreen();
+                        } else if (videosContainera.mozRequestFullScreen) {
+                            videosContainera.mozRequestFullScreen(); // Firefox
+                        } else if (videosContainera.webkitRequestFullscreen) {
+                            videosContainera.webkitRequestFullscreen(); // Chrome and Safari
+                        }
+                    }
+
+                });
+
+                $("#stoprecord").addEventListener("click", function () {
+                    recorder.stop();
+                    recorder.oncompleted = function (blob, blobUrl) {
+                        trace("Recorder blobUrl.. ", blobUrl);
+                        trace("Recorder completed.. ");
+                        trace("Recorder blobUrl.. ", blobUrl);
+                        var li = document.createElement("li");
+                        var download = document.createElement("a");
+                        download.textContent = new Date();
+                        download.setAttribute("download", XSockets.Utils.randomString(8) + ".webm");
+                        download.setAttribute("href", blobUrl);
+                        li.appendChild(download);
+                        $("#LocalDiv ul").append(li);
+
+                    };
+                });
+            };
+            var onContextCreated = function (ctx) {
+                trace("RTC object created, and a context is created - ", ctx);
+                console.log("UserMedia Ok");
+                rtc.getUserMedia(rtc.userMediaConstraints.hd(true), onGetUerMedia, onError);
+            };
+            var onOpen = function () {
+                trace("Connected to the brokerController - 'connectionBroker'");
+                rtc = new XSockets.WebRTC(this);
+
+
+                rtc.oncontextcreated = onContextCreated;
+                rtc.onlocalstream = onLocalStream;
+                rtc.onconnectioncreated = oncConnectionCreated;
+                rtc.onconnectionlost = onConnectionLost;
+                rtc.onremotestream = onRemoteStream;
+                //rtc.onanswer = function (event) {
+
+                //};
+                //rtc.onoffer = function (event) {
+                //};
+
+            };
+
+            var onConnected = function () {
+                console.log("connection to the 'broker' server is established");
+                console.log("Try get the broker controller form server..");
+                trace("connection to the 'broker' server is established");
+                trace("Try get the broker controller form server..");
+                broker = ws.controller("connectionbroker");
+                broker.onopen = onOpen;
+            };
+            ws.onconnected = onConnected;
+        }
+    });
+    //document.addEventListener("DOMContentLoaded", main);
+    //document.getElementById("localv").addEventListener("mouseover", mouseOver);
+    //document.getElementById("localv").addEventListener("mouseout", mouseOut);
+
+
+    //function mouseOver() {
+    //    document.getElementById("belowdiv").style.opacity = "1";
+    //}
+
+    //function mouseOut() {
+    //    document.getElementById("belowdiv").style.opacity = "0";
+    //}
+
+
+
+</script>
+
+<table style="width:100%;">
+    <tr>
+        <td style="width:100%;">
+            <div style="position:absolute; margin-top:2%;">
+                <input type="button" value="Start Local Recording" id="startrecord" class="btn  btn-primary" style="display:none;" />
+                <input type="button" value="Stop Local Recordning" id="stoprecord" class="btn btn-primary" style="display:none;" />
+                <input type="button" value="Start Remote Recording" id="startRrecord" class="btn btn-primary" style="display:none;" />
+                <input type="button" value="Stop Remote Recordning" id="stopRrecord" class="btn btn-primary" style="display:none;" />
+                <input type="button" value="Start Interview" id="startInterview" onclick="main();" class="btn btn-danger" />
+
+
+            </div>
+            <div style="position:absolute; margin-top:25%; display:none;" id="belowdiv">
+                <div id="refreshvideo" class="btn btn-danger fa fa-refresh fa-2x" style="margin-left: 6px;  color:red;" onclick="location.reload();"></div><br /><br />
+                <div id="fullscreen" class="btn btn-danger fa fa-arrows-alt fa-2x" style="margin-left: 6px;  color:red;"></div><br /><br />
+                <div id="mutevideo" class="btn btn-danger fa fa-video-camera fa-2x" style="margin-left: 6px;  color:red;"></div><br /><br />
+                <div id="muteAudio" class="btn btn-danger fa fa-microphone fa-2x" style="margin-left: 6px;  color:red; margin-top:3px;"></div><br /><br />
+
+
+            </div>
+            <div class="remotevideos" id="Remotev"></div>
+            <div class="RemoteDefult" id="RD">
+                <img src="Images/Micon.png" style="width:100%; height:555px;" />
+            </div>
+            <div class="localvideo " id="localv">
+                <video autoplay class="backgroundset" id="locvid"></video>
+            </div>
+         
+        </td>
+    </tr>
+</table>
+
+
+
+<div id="LocalDiv" style="display:none;">Local - <ul></ul></div>
+<div id="contentvv" style="display:none;">Remote - <ul></ul></div>
+
+<div id="remotevid"></div>
+
+<script type="text/javascript">
+    //if(@Html.Raw(Json.Encode(ViewBag.Employee)) != 1)
+    //{
+        document.getElementById('startrecord').style.display = "none";
+        document.getElementById('stoprecord').style.display = "none";
+    //}
+</script>
+
