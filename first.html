@@ -95,7 +95,7 @@
                 attachMediaStream(remoteVideo, mediaStream);
                 remoteVideo.setAttribute("class", "backgroundset");
 
-                remoteVideo.setAttribute("volume", 0);
+                remoteVideo.setAttribute("volume", 0.6);
                 remoteVideo.setAttribute("muted", 0);
 
                 document.getElementById("locvid").className =
@@ -193,7 +193,7 @@
             var onLocalStream = function (mediaStream) {
                 trace("Got a localStream", mediaStream.id);
                 attachMediaStream($(".localvideo video "), mediaStream);
-                document.getElementById("locvid").volume= 0;
+                document.getElementById("locvid").volume= 0.6;
                 document.getElementById("locvid").muted= 0;
 
                 //   document.getElementById('DG').style.display = "none";
